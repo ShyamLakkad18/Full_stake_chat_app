@@ -1,0 +1,76 @@
+pipeline {
+    agent { label 'jenkins' }
+    environment {
+        DOCKER_USER = "shyamlakkad"
+        DOCKER_IMAGE_BACKEND = "backend"
+        DOCKER_IMAGE_FRONTEND = "frontend"
+        DOCKER_TAG = "${BUILD_NUMBER}"
+    }
+    stages {
+        stage('Code Clone') {
+            steps {
+                git url: 'https://github.com/ShyamLakkad18/Full_stake_chat_app.git', branch: 'main'
+            }
+        }
+        stage('Build docker image') {
+            steps {
+                sh'''
+                docker build -t $DOCKER_IMAGE_BACKEND:$DOCKER_TAG ./backend
+                docker build -t $DOCKER_IMAGE_FRONTEND:$DOCKER_TAG ./frontend
+                '''
+              }
+        }
+        stage('Push on docer hub') {
+            steps {
+            withCredentials([usernamePassword(credentialsId:'dockerHub',
+            usernameVariable:'DOCKER_USERNAME',
+            passwordVariable:'DOCKER_PASS'
+            )]){
+            sh'''
+            echo $DOCKER_PASS | docker login -u $DOCKER_USERNAME --password-stdin
+            docker tag $DOCKER_IMAGE_BACKEND:$DOCKER_TAG   $DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG
+            docker tag $DOCKER_IMAGE_FRONTEND:$DOCKER_TAG  $DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG
+            
+            docker push $DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG
+            docker push $DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG
+            '''
+               }
+            }
+        }
+        stage('Build on k8s') {
+            steps{
+                sh '''
+                kubectl apply -f k8s/secret.yml -n nginx
+                
+                kubectl apply -f k8s/backend-service.yml -n nginx
+                kubectl apply -f k8s/backend-deployment.yml  -n nginx
+                
+                kubectl apply -f k8s/frontend-service.yml -n nginx
+                kubectl apply -f k8s/frontend-deployment.yml -n nginx
+                '''
+            }
+        }
+        stage('update image') {
+            steps {
+                sh '''
+                kubectl set image deployment/backend-deployment \
+                backend=$DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG  -n nginx
+                
+                kubectl set image deployment/frontend-deployment \
+                frontend=$DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG  -n nginx
+                '''
+            }
+        }
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                kubectl get svc -n nginx
+                kubectl rollout status deployment/backend-deployment -n nginx
+                kubectl rollout status deployment/frontend-deployment -n nginx
+                
+                kubectl get pods -n nginx
+                '''
+            }
+        }
+    }
+}
