@@ -27,7 +27,7 @@ spec:
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
-               name: secret
+              name: secret
               key: key
         - name: PORT
           value: "5001"
