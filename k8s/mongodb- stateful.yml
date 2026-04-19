@@ -27,7 +27,7 @@ spec:
           value: secret
         volumeMounts:
           - name: mongodb
-          mountPath: /data/db
+            mountPath: /data/db
 
   volumeClaimTemplates:
   - metadata:
