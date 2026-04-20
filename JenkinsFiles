@@ -1,76 +1,116 @@
 pipeline {
     agent { label 'jenkins' }
+
     environment {
         DOCKER_USER = "shyamlakkad"
         DOCKER_IMAGE_BACKEND = "backend"
         DOCKER_IMAGE_FRONTEND = "frontend"
         DOCKER_TAG = "${BUILD_NUMBER}"
+        NAMESPACE = "nginx"
     }
+
     stages {
-        stage('Code Clone') {
+        stage('Checkout Code') {
             steps {
                 git url: 'https://github.com/ShyamLakkad18/Full_stake_chat_app.git', branch: 'main'
             }
         }
-        stage('Build docker image') {
+
+        stage('Run Tests') {
             steps {
-                sh'''
+                sh '''
+                set -e
+                echo "Running backend tests..."
+                cd backend
+                npm install
+                npm test 
+
+                echo "Running frontend tests..."
+                cd ../frontend
+                npm install
+                npm test
+                '''
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                sh '''
+                set -e
                 docker build -t $DOCKER_IMAGE_BACKEND:$DOCKER_TAG ./backend
                 docker build -t $DOCKER_IMAGE_FRONTEND:$DOCKER_TAG ./frontend
                 '''
-              }
-        }
-        stage('Push on docer hub') {
-            steps {
-            withCredentials([usernamePassword(credentialsId:'dockerHub',
-            usernameVariable:'DOCKER_USERNAME',
-            passwordVariable:'DOCKER_PASS'
-            )]){
-            sh'''
-            echo $DOCKER_PASS | docker login -u $DOCKER_USERNAME --password-stdin
-            docker tag $DOCKER_IMAGE_BACKEND:$DOCKER_TAG   $DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG
-            docker tag $DOCKER_IMAGE_FRONTEND:$DOCKER_TAG  $DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG
-            
-            docker push $DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG
-            docker push $DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG
-            '''
-               }
             }
         }
-        stage('Build on k8s') {
-            steps{
-                sh '''
-                kubectl apply -f k8s/secret.yml -n nginx
-                
-                kubectl apply -f k8s/backend-service.yml -n nginx
-                kubectl apply -f k8s/backend-deployment.yml  -n nginx
-                
-                kubectl apply -f k8s/frontend-service.yml -n nginx
-                kubectl apply -f k8s/frontend-deployment.yml -n nginx
-                '''
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerHub',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                    set -e
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USERNAME --password-stdin
+
+                    docker tag $DOCKER_IMAGE_BACKEND:$DOCKER_TAG $DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG
+                    docker tag $DOCKER_IMAGE_FRONTEND:$DOCKER_TAG $DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG
+
+                    docker push $DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG
+                    docker push $DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG
+
+                    docker logout
+                    '''
+                }
             }
         }
-        stage('update image') {
+
+        stage('Deploy to Kubernetes') {
             steps {
                 sh '''
+                set -e
+
+                kubectl create namespace $NAMESPACE || true
+
+                kubectl apply -f k8s/secret.yml -n $NAMESPACE
+                kubectl apply -f k8s/backend-service.yml -n $NAMESPACE
+                kubectl apply -f k8s/frontend-service.yml -n $NAMESPACE
+
+                
                 kubectl set image deployment/backend-deployment \
-                backend=$DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG  -n nginx
-                
+                backend=$DOCKER_USER/$DOCKER_IMAGE_BACKEND:$DOCKER_TAG -n $NAMESPACE
+
                 kubectl set image deployment/frontend-deployment \
-                frontend=$DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG  -n nginx
+                frontend=$DOCKER_USER/$DOCKER_IMAGE_FRONTEND:$DOCKER_TAG -n $NAMESPACE
                 '''
             }
         }
+
         stage('Verify Deployment') {
             steps {
                 sh '''
-                kubectl get svc -n nginx
-                kubectl rollout status deployment/backend-deployment -n nginx
-                kubectl rollout status deployment/frontend-deployment -n nginx
-                
-                kubectl get pods -n nginx
+                set -e
+
+                kubectl rollout status deployment/backend-deployment -n $NAMESPACE
+                kubectl rollout status deployment/frontend-deployment -n $NAMESPACE
+
+                kubectl get pods -n $NAMESPACE
+                kubectl get svc -n $NAMESPACE
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deployment successful!"
+        }
+        failure {
+            echo "❌ Pipeline failed! Check logs."
+        }
+        always {
+            sh 'docker system prune -f || true'
         }
     }
 }
