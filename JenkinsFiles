@@ -104,10 +104,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Deployment successful!"
+            echo "Deployment successful!"
         }
         failure {
-            echo "❌ Pipeline failed! Check logs."
+            echo "Pipeline failed! Check logs."
         }
         always {
             sh 'docker system prune -f || true'
