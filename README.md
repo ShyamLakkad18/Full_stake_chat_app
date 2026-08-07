@@ -351,17 +351,6 @@ Steps:
 
 ---
 
-# 👨‍💻 Developer
-
-
-**Afzal Hassan**
-
-Full Stack Developer
-
-
-GitHub:
-https://github.com/iemafzalhassan
-
 
 ---
 
