@@ -19,7 +19,7 @@ spec:
         image: shyam8080/backend:6
         ports:
           - containerPort: 5001
-         resources:
+        resources:
           requests:
             cpu: "100m"
             memory: "128Mi"
