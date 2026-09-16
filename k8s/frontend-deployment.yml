@@ -3,8 +3,6 @@ apiVersion: apps/v1
 metadata:
   name: frontend-deployment
   namespace: nginx
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   selector:
