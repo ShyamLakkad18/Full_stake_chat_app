@@ -1,31 +1,49 @@
-kind: Deployment
 apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: frontend-deployment
   namespace: nginx
 spec:
   replicas: 1
+
   selector:
     matchLabels:
       app: frontend
+
   template:
     metadata:
-      name: frontend-pod
       labels:
         app: frontend
+
     spec:
+      initContainers:
+        - name: wait-for-backend
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Backend..."
+              until nc -z backend 5001; do
+                echo "Backend not ready..."
+                sleep 2
+              done
+              echo "Backend is ready!"
+
       containers:
-      - name: frontend
-        image: shyam8080/frontend:v7
-        ports:
-          - containerPort: 80
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
-        env:
-        - name: NODE_ENV
-          value: production
+        - name: frontend
+          image: shyam8080/frontend:v7
+          ports:
+            - containerPort: 80
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          env:
+            - name: NODE_ENV
+              value: production
