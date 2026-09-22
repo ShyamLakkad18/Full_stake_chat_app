@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: shyam8080/frontend:6
+        image: shyam8080/frontend:v7
         ports:
           - containerPort: 80
         resources:
