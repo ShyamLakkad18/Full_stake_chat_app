@@ -1,5 +1,5 @@
-kind: Deployment
 apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: backend-deployment
   namespace: nginx
@@ -8,33 +8,53 @@ spec:
   selector:
     matchLabels:
       app: backend
+
   template:
     metadata:
-      name: backend-pod
       labels:
         app: backend
+
     spec:
+      initContainers:
+        - name: wait-for-mongodb
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MongoDB..."
+              until nc -z mongodb 27017; do
+                echo "MongoDB not ready..."
+                sleep 2
+              done
+              echo "MongoDB is ready!"
+
       containers:
-      - name: backend
-        image: shyam8080/backend:v7
-        ports:
-          - containerPort: 5001
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
-        env:
-        - name: NODE_ENV
-          value: production
-        - name: MONGODB_URI
-          value: "mongodb://mongoadmin:secret@mongodb:27017/dbname?authSource=admin"
-        - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: secret
-              key: key
-        - name: PORT
-          value: "5001"
+        - name: backend
+          image: shyam8080/backend:v7
+          ports:
+            - containerPort: 5001
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          env:
+            - name: NODE_ENV
+              value: production
+
+            - name: MONGODB_URI
+              value: "mongodb://mongoadmin:secret@mongodb:27017/dbname?authSource=admin"
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: secret
+                  key: key
+
+            - name: PORT
+              value: "5001"
