@@ -11,7 +11,7 @@ spec:
   template:
     metadata:
       name: mongodb-pod
-      namespace: chat-app
+      namespace: nginx
       labels: 
         app: mongodb
     spec:
