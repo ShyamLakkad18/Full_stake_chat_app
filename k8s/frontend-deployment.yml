@@ -32,7 +32,7 @@ spec:
 
       containers:
         - name: frontend
-          image: shyam8080/frontend:v7
+          image: shyam8080/frontend:8
           ports:
             - containerPort: 80
 
