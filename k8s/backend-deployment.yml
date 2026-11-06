@@ -31,7 +31,7 @@ spec:
 
       containers:
         - name: backend
-          image: shyam8080/backend:8
+          image: shyam8080/backend:4
           ports:
             - containerPort: 5001
 
